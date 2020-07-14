@@ -1,1 +1,1 @@
-# my_project
+# Qt Project
