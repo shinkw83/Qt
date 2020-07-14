@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/fonts">
+        <file>font/NanumGothic.ttf</file>
+    </qresource>
+    <qresource prefix="/imgs">
+        <file>imgs/btn_off.png</file>
+        <file>imgs/btn_on.png</file>
+    </qresource>
+</RCC>
