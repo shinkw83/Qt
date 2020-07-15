@@ -32,6 +32,9 @@ private slots:
 
     void on_btn_cancle__clicked();
 
+public slots:
+    void receive_data(QString dateTime);
+
 private:
     Ui::MainWindow *ui;
 

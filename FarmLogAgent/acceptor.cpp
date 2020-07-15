@@ -22,10 +22,10 @@ acceptor::~acceptor() {
 
 void acceptor::run() {
     while (run_flag_) {
-        if (accepted_ == true) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            continue;
-        }
+        //if (accepted_ == true) {
+            //std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            //continue;
+        //}
 
         tcp::socket *sock = new tcp::socket(io_ctx_);
         try {
@@ -47,7 +47,11 @@ void acceptor::run() {
         }
 
         qInfo() << "Accepted from client.";
-        agent_ = new log_agent(sock, path_);
+        agent_ = new log_agent(sock, path_, this);
         accepted_ = true;
     }
+}
+
+void acceptor::receive_date_time(QString dateTime) {
+    emit send_date_time(dateTime);
 }

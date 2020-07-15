@@ -7,6 +7,7 @@ CONFIG += c++11
 win32 {
     CONFIG += embed_manifest_exe
     QMAKE_LFLAGS_WINDOWS += /MANIFESTUAC:level=\'requireAdministrator\'
+    QMAKE_CXXFLAGS += /utf-8
 }
 
 # The following define makes your compiler emit warnings if you use

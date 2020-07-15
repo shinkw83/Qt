@@ -2,16 +2,24 @@
 
 #include <boost/asio.hpp>
 #include "log_agent.h"
+#include <QObject>
+#include <QString>
 
 using boost::asio::ip::tcp;
 
-class acceptor {
+class acceptor : public QObject {
+    Q_OBJECT
 public:
 	acceptor(int port, std::string path);
 	~acceptor();
 
+    void receive_date_time(QString dateTime);
+
 private:
 	void run();
+
+signals:
+    void send_date_time(QString dateTime);
 
 private:
 	boost::asio::io_context io_ctx_;

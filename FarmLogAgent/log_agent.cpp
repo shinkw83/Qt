@@ -6,10 +6,12 @@
 #include <QFile>
 #include <QTextStream>
 #include "logging.h"
+#include "acceptor.h"
 
-log_agent::log_agent(tcp::socket *sock, std::string path) {
+log_agent::log_agent(tcp::socket *sock, std::string path, void *parent) {
 	sock_ = sock;
 	path_ = path;
+    parent_ = parent;
 
     set_column_list();
 
@@ -269,6 +271,13 @@ void log_agent::write_func(const std::string &key, const time_t &mesure_time, co
     QTextStream saveStream(&qfile);
     saveStream << qwrite_data;
     qfile.close();
+
+    char datetime[512] = {0, };
+    snprintf(datetime, sizeof(datetime), "%04d-%02d-%02d %02d:%02d:%02d",
+             ltime->tm_year, ltime->tm_mon, ltime->tm_mday, ltime->tm_hour, ltime->tm_min, ltime->tm_sec);
+    QString qdatetime = QString::fromUtf8(datetime);
+    acceptor* acptor = static_cast<acceptor *>(parent_);
+    acptor->receive_date_time(qdatetime);
 
     //FILE *p = fopen(filename, "w");
     //fwrite(write_data.data(), write_data.size(), 1, p);

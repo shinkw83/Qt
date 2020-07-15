@@ -5,5 +5,8 @@
     <qresource prefix="/imgs">
         <file>imgs/btn_off.png</file>
         <file>imgs/btn_on.png</file>
+        <file>imgs/Agent_Run.png</file>
+        <file>imgs/Agent_Stop.png</file>
+        <file>imgs/MyThings_Info.png</file>
     </qresource>
 </RCC>
