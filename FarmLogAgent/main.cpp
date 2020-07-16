@@ -16,6 +16,7 @@ int main(int argc, char *argv[])
         QMessageBox::information(&w, "Error", "프로그램이 이미 실행 되고 있습니다.");
         exit(0);
     }
+    w.init();
     w.show();
     return a.exec();
 }

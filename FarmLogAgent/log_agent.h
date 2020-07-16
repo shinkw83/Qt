@@ -22,7 +22,7 @@ using boost::asio::ip::tcp;
 class log_agent
 {
 public:
-    log_agent(tcp::socket *sock, std::string path, void *parent);
+    log_agent(tcp::socket *sock, std::string path, void *parent, int pkt_size);
 	~log_agent();
 
 private:
@@ -48,6 +48,7 @@ private:
 	std::atomic<bool> save_flag_{ false };
 
 	std::string path_;
+    int pkt_size_;
 
     std::vector<std::string> column_list_;
 

@@ -10,10 +10,11 @@ using boost::asio::ip::tcp;
 class acceptor : public QObject {
     Q_OBJECT
 public:
-	acceptor(int port, std::string path);
+    acceptor(int port, std::string path, int pkt_size);
 	~acceptor();
 
     void receive_date_time(QString dateTime);
+    void open_listen_socket();
 
 private:
 	void run();
@@ -32,5 +33,6 @@ private:
 	log_agent *agent_ = nullptr;
 
 	std::string path_;
+    int pkt_size_;
 };
 

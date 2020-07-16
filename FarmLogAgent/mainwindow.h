@@ -17,6 +17,8 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+    void init();
+
 private slots:
     void on_btn_info__clicked();
 
@@ -40,5 +42,8 @@ private:
 
     acceptor *listener_ = nullptr;
     QString save_path_;
+
+    int port_ = 6565;
+    int pkt_size_ = 99;
 };
 #endif // MAINWINDOW_H

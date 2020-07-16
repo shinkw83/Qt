@@ -8,10 +8,11 @@
 #include "logging.h"
 #include "acceptor.h"
 
-log_agent::log_agent(tcp::socket *sock, std::string path, void *parent) {
+log_agent::log_agent(tcp::socket *sock, std::string path, void *parent, int pkt_size) {
 	sock_ = sock;
 	path_ = path;
     parent_ = parent;
+    pkt_size_ = pkt_size;
 
     set_column_list();
 
@@ -86,15 +87,17 @@ void log_agent::run() {
 
         // read data from tcp socket
         std::vector<char> buf;
-        buf.resize(100);
+        buf.resize(pkt_size_ + 1);
         try {
-            boost::asio::read(*sock_, boost::asio::buffer(buf.data(), 99));
+            boost::asio::read(*sock_, boost::asio::buffer(buf.data(), pkt_size_));
         } catch (const std::exception &e) {
             QString errorlog = QString::fromUtf8(e.what());
             errorlog = "Read error. " + errorlog;
             qCritical() << errorlog;
             sock_->close();
             save_flag_ = true;
+            acceptor* acptor = static_cast<acceptor *>(parent_);
+            acptor->open_listen_socket();
             return;
         }
 

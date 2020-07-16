@@ -25,6 +25,10 @@
   <property name="windowTitle">
    <string>데이터 수집 Agent</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="farm_resource.qrc">
+    <normaloff>:/imgs/imgs/agent_icon.png</normaloff>:/imgs/imgs/agent_icon.png</iconset>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QPushButton" name="btn_home_">
     <property name="geometry">
@@ -592,6 +596,19 @@ QPushButton#btn_info_:pressed {
     </property>
     <property name="text">
      <string/>
+    </property>
+   </widget>
+   <widget class="QLabel" name="lbl_port_">
+    <property name="geometry">
+     <rect>
+      <x>475</x>
+      <y>135</y>
+      <width>120</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Agent Port : 6565</string>
     </property>
    </widget>
   </widget>

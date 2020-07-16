@@ -8,5 +8,6 @@
         <file>imgs/Agent_Run.png</file>
         <file>imgs/Agent_Stop.png</file>
         <file>imgs/MyThings_Info.png</file>
+        <file>imgs/agent_icon.png</file>
     </qresource>
 </RCC>
