@@ -105,42 +105,43 @@ void log_agent::run() {
         std::vector<std::string> words;
         boost::algorithm::split(words, data, boost::algorithm::is_any_of("|"));
 
+        // column size check
         if (words.size() != 26) {
             // error log
             QString errorlog = QString::fromUtf8(data.c_str());
-            qCritical() << "Read data colimn size missmatch.";
+            qCritical() << "Read data column count missmatch.";
             qCritical() << errorlog;
             continue;
         }
+
+        // date time size check
+        if (words[10].size() != 19) {
+            // error log
+            qCritical() << "DateTime column size missmatch.";
+            continue;
+        }
+
+        // parse date time
+        std::string datetime = words[10];
+        std::string tyear = datetime.substr(0, 4);
+        std::string tmon = datetime.substr(5, 2);
+        std::string tday = datetime.substr(8, 2);
+        std::string thour = datetime.substr(11, 2);
+        std::string tmin = datetime.substr(14, 2);
+        std::string tsec = datetime.substr(17, 2);
 
         // make key
         std::string key = words[2] + "_" + words[0] + "_" + words[3];
-        std::vector<std::string> mesureday;
-        boost::algorithm::split(mesureday, words[10], boost::algorithm::is_any_of("-"));
-        if (mesureday.size() != 4) {
-            QString errorlog = QString::fromUtf8(words[10].c_str());
-            qCritical() << "DateTime data is wrong.";
-            qCritical() << errorlog;
-            continue;
-        }
-        std::vector<std::string> mesuretime;
-        boost::algorithm::split(mesuretime, mesureday[3], boost::algorithm::is_any_of(":"));
-        if (mesuretime.size() != 3) {
-            QString errorlog = QString::fromUtf8(mesureday[3].c_str());
-            qCritical() << "Time data is wrong.";
-            qCritical() << errorlog;
-            continue;
-        }
 
         struct tm mesuredt;
-        mesuredt.tm_year = boost::lexical_cast<int>(mesureday[0]) - 1900;
-        mesuredt.tm_mon = boost::lexical_cast<int>(mesureday[1]) - 1;
-        mesuredt.tm_mday = boost::lexical_cast<int>(mesureday[2]);
-        mesuredt.tm_hour = boost::lexical_cast<int>(mesuretime[0]);
-        mesuredt.tm_min = boost::lexical_cast<int>(mesuretime[1]);
-        mesuredt.tm_sec = boost::lexical_cast<int>(mesuretime[2]);
+        mesuredt.tm_year = boost::lexical_cast<int>(tyear) - 1900;
+        mesuredt.tm_mon = boost::lexical_cast<int>(tmon) - 1;
+        mesuredt.tm_mday = boost::lexical_cast<int>(tday);
+        mesuredt.tm_hour = boost::lexical_cast<int>(thour);
+        mesuredt.tm_min = boost::lexical_cast<int>(tmin);
+        mesuredt.tm_sec = boost::lexical_cast<int>(tsec);
 
-        words[10] = mesureday[0] + "-" + mesureday[1] + "-" + mesureday[2] + " " + mesuretime[0] + ":" + mesuretime[1] + ":" + mesuretime[2];
+        //words[10] = mesureday[0] + "-" + mesureday[1] + "-" + mesureday[2] + " " + mesuretime[0] + ":" + mesuretime[1] + ":" + mesuretime[2];
 
         time_t key_time = mktime(&mesuredt);
 
