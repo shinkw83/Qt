@@ -57,7 +57,7 @@ void log_agent::set_column_list() {
     column_list_[16] = "mesureVal06";
     column_list_[17] = "mesureVal07";
     column_list_[18] = "mesureVal08";
-    column_list_[19] = "mesureVal00";
+    column_list_[19] = "mesureVal09";
     column_list_[20] = "mesureVal10";
     column_list_[21] = "mesureVal11";
     column_list_[22] = "mesureVal12";
