@@ -93,7 +93,7 @@ void log_agent::run() {
         } catch (const std::exception &e) {
             QString errorlog = QString::fromUtf8(e.what());
             errorlog = "Read error. " + errorlog;
-            qCritical() << errorlog;
+            qCritical() << errorlog << "," << QString::fromUtf8(buf.data());
             sock_->close();
             save_flag_ = true;
             acceptor* acptor = static_cast<acceptor *>(parent_);
@@ -118,8 +118,11 @@ void log_agent::run() {
         if (words[10].size() != 19) {
             // error log
             qCritical() << "DateTime column size missmatch.";
+            qCritical() << QString::fromUtf8(data.c_str());
             continue;
         }
+
+        qInfo() << "Receive : [" << QString::fromUtf8(data.c_str()) << "]";
 
         // parse date time
         std::string datetime = words[10];
@@ -201,7 +204,10 @@ void log_agent::proc_save() {
 		std::chrono::duration<double> el_sec = now - start;
 		if (el_sec.count() > time_limit) {
 			save_func();
-		}
+            start = now;
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
 	}
 }
 
@@ -269,7 +275,13 @@ void log_agent::write_func(const std::string &key, const time_t &mesure_time, co
     QString qpath = QString::fromUtf8(filename);
 
     QFile qfile(qpath);
-    qfile.open(QFile::WriteOnly|QFile::Text);
+    if (!qfile.open(QFile::WriteOnly|QFile::Text)) {
+        qCritical() << "File open fail.[" << qpath << "][" << filename << "]";
+        qCritical() << "Data : " << QString::fromUtf8(write_data.c_str()) << " save fail.";
+        return;
+    }
+
+    qInfo() << "Save file path : [" << qpath << "][" << filename << "]";
 
     QString qwrite_data = QString::fromUtf8(write_data.c_str());
     QTextStream saveStream(&qfile);

@@ -22,7 +22,7 @@ void logging::write() {
 
 void logging::message_handler(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
     QTextStream out(log_file_.data());
-    out << QDateTime::currentDateTime().toString("hh:mm:ss");
+    out << QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
 
     switch(type) {
     case QtInfoMsg:
