@@ -13,27 +13,18 @@ log_agent::log_agent(tcp::socket *sock, std::string path, void *parent, int pkt_
 	path_ = path;
     parent_ = parent;
     pkt_size_ = pkt_size;
+    data_.resize(pkt_size_ + 1);
 
     set_column_list();
 
-	run_th_ = std::thread(&log_agent::run, this);
-	proc_th_ = std::thread(&log_agent::proc_save, this);
+    start_read();
 }
 
 
 log_agent::~log_agent() {
-	run_flag_ = false;
-	if (run_th_.joinable()) {
-		run_th_.join();
-	}
-
-	proc_flag_ = false;
-	if (proc_th_.joinable()) {
-		proc_th_.join();
-	}
-
-    sock_->close();
 	delete sock_;
+
+    qInfo() << "Destroy log agent";
 }
 
 void log_agent::set_column_list() {
@@ -66,236 +57,87 @@ void log_agent::set_column_list() {
     column_list_[25] = "mesureVal15";
 }
 
-void log_agent::run() {
-	while (run_flag_) {
-		fd_set fd_in;
-		struct timeval timeout;
-
-		timeout.tv_sec = 1;
-		timeout.tv_usec = 0;
-
-		FD_ZERO(&fd_in);
-		int fd = sock_->native_handle();
-		FD_SET(fd, &fd_in);
-
-		select(fd + 1, &fd_in, nullptr, nullptr, &timeout);
-
-		if (!FD_ISSET(fd, &fd_in)) {
-			save_flag_ = true;
-			continue;
-		}
-
-        // read data from tcp socket
-        std::vector<char> buf;
-        buf.resize(pkt_size_ + 1);
-        try {
-            boost::asio::read(*sock_, boost::asio::buffer(buf.data(), pkt_size_));
-        } catch (const std::exception &e) {
-            QString errorlog = QString::fromUtf8(e.what());
-            errorlog = "Read error. " + errorlog;
-            qCritical() << errorlog << "," << QString::fromUtf8(buf.data());
-            sock_->close();
-            save_flag_ = true;
-            acceptor* acptor = static_cast<acceptor *>(parent_);
-            acptor->open_listen_socket();
-            return;
-        }
-
-        std::string data = buf.data();
-        std::vector<std::string> words;
-        boost::algorithm::split(words, data, boost::algorithm::is_any_of("|"));
-
-        // column size check
-        if (words.size() != 26) {
-            // error log
-            QString errorlog = QString::fromUtf8(data.c_str());
-            qCritical() << "Read data column count missmatch.";
-            qCritical() << errorlog;
-            continue;
-        }
-
-        // date time size check
-        if (words[10].size() != 19) {
-            // error log
-            qCritical() << "DateTime column size missmatch.";
-            qCritical() << QString::fromUtf8(data.c_str());
-            continue;
-        }
-
-        qInfo() << "Receive : [" << QString::fromUtf8(data.c_str()) << "]";
-
-        // parse date time
-        std::string datetime = words[10];
-        std::string tyear = datetime.substr(0, 4);
-        std::string tmon = datetime.substr(5, 2);
-        std::string tday = datetime.substr(8, 2);
-        std::string thour = datetime.substr(11, 2);
-        std::string tmin = datetime.substr(14, 2);
-        std::string tsec = datetime.substr(17, 2);
-
-        // make key
-        std::string key = words[2] + "_" + words[0] + "_" + words[3];
-
-        struct tm mesuredt;
-        mesuredt.tm_year = boost::lexical_cast<int>(tyear) - 1900;
-        mesuredt.tm_mon = boost::lexical_cast<int>(tmon) - 1;
-        mesuredt.tm_mday = boost::lexical_cast<int>(tday);
-        mesuredt.tm_hour = boost::lexical_cast<int>(thour);
-        mesuredt.tm_min = boost::lexical_cast<int>(tmin);
-        mesuredt.tm_sec = boost::lexical_cast<int>(tsec);
-
-        //words[10] = mesureday[0] + "-" + mesureday[1] + "-" + mesureday[2] + " " + mesuretime[0] + ":" + mesuretime[1] + ":" + mesuretime[2];
-
-        time_t key_time = mktime(&mesuredt);
-
-        std::string json_string;
-        for (int i = 0; i < 26; i++) {
-            char key_value[256] = {0, };
-            if (i < 12 && words[i] == "NONE") {
-                words[i] = "";
-            } else if (i > 11 && words[i] == "0") {
-                words[i] = "";
-            }
-
-            if (i == 0) {
-                snprintf(key_value, sizeof(key_value), "{ \"%s\" : \"%s\", ", column_list_[i].c_str(), words[i].c_str());
-            } else if (i == 25) {
-                snprintf(key_value, sizeof(key_value), "\"%s\" : \"%s\" }", column_list_[i].c_str(), words[i].c_str());
-            } else {
-                snprintf(key_value, sizeof(key_value), "\"%s\" : \"%s\", ", column_list_[i].c_str(), words[i].c_str());
-            }
-            json_string += key_value;
-        }
-
-        std::lock_guard<std::mutex> guard(log_mutex_);
-
-        auto key_it = log_key_.find(key);
-        if (key_it == log_key_.end()) {
-            std::set<time_t> temp;
-            temp.insert(key_time);
-            log_key_.insert(std::pair<std::string, std::set<time_t>>(key, temp));
-
-            std::vector<std::string> logdata;
-            logdata.push_back(json_string);
-            log_data_.insert(std::pair<time_t, std::vector<std::string>>(key_time, logdata));
-        } else {
-            auto time_it = key_it->second.find(key_time);
-            if (time_it == key_it->second.end()) {
-                key_it->second.insert(key_time);
-
-                std::vector<std::string> logdata;
-                logdata.push_back(json_string);
-                log_data_.insert(std::pair<time_t, std::vector<std::string>>(key_time, logdata));
-            } else {
-                auto data_it = log_data_.find(key_time);
-                if (data_it != log_data_.end()) {
-                    data_it->second.push_back(json_string);
-                }
-            }
-        }
-	}
+void log_agent::start_read() {
+    boost::asio::async_read(*sock_, boost::asio::buffer(data_, pkt_size_),
+        boost::bind(&log_agent::handle_read, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 }
 
-void log_agent::proc_save() {
-	const double time_limit = 1.0;
-	std::chrono::time_point<std::chrono::system_clock> start = std::chrono::system_clock::now();
-	while (proc_flag_) {
-		std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
-		std::chrono::duration<double> el_sec = now - start;
-		if (el_sec.count() > time_limit) {
-			save_func();
-            start = now;
-        } else {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        }
-	}
+void log_agent::handle_read(const boost::system::error_code &ec, std::size_t n) {
+    if (!ec) {
+        data_[pkt_size_] = 0x00;
+        qInfo() << "Read data size[" << n << "]";
+        qInfo() << "Read data[" << QString::fromUtf8(data_.data()) << "]";
+        save_data(data_.data());
+        start_read();
+    } else {
+        qCritical() << "Read Error[" << QString::fromUtf8(ec.message().c_str()) << "]";
+    }
 }
 
-void log_agent::save_func() {
-	std::lock_guard<std::mutex> guard(log_mutex_);
+void log_agent::save_data(std::string data) {
+    std::vector<std::string> words;
+    boost::algorithm::split(words, data, boost::algorithm::is_any_of("|"));
 
-	if (save_flag_) {
-		save_flag_ = false;
-
-		// whole save
-		auto key_it = log_key_.begin();
-		while (key_it != log_key_.end()) {
-			for (auto time_it : key_it->second) {
-				auto data = log_data_.find(time_it);
-				if (data != log_data_.end()) {
-					write_func(key_it->first, time_it, data->second);
-					log_data_.erase(data);
-				}
-			}
-			key_it->second.clear();
-			key_it++;
-		}
-	}
-	else {
-		auto key_it = log_key_.begin();
-		while (key_it != log_key_.end()) {
-			auto time_it = key_it->second.begin();
-			while (time_it != key_it->second.end()) {
-				if (key_it->second.size() < 2) {
-					time_it++;
-					continue;
-				}
-
-				auto data = log_data_.find(*time_it);
-				if (data != log_data_.end()) {
-					write_func(key_it->first, *time_it, data->second);
-					log_data_.erase(data);
-				}
-				time_it = key_it->second.erase(time_it);
-			}
-
-			key_it++;
-		}
-	}
-}
-
-void log_agent::write_func(const std::string &key, const time_t &mesure_time, const std::vector<std::string> &data) {
-	struct tm *ltime = localtime(&mesure_time);
-	ltime->tm_year = ltime->tm_year + 1900;
-	ltime->tm_mon = ltime->tm_mon + 1;
-
-	char filename[512] = { 0, };
-#if defined (MACOS)
-    snprintf(filename, sizeof(filename), "%s/%s_%04d%02d%02d_%02d%02d%02d.log",
-		path_.c_str(), key.c_str(), ltime->tm_year, ltime->tm_mon, ltime->tm_mday, ltime->tm_hour, ltime->tm_min, ltime->tm_sec);
-#elif defined (WINDOWS)
-    snprintf(filename, sizeof(filename), "%s\\%s_%04d%02d%02d_%02d%02d%02d.log",
-        path_.c_str(), key.c_str(), ltime->tm_year, ltime->tm_mon, ltime->tm_mday, ltime->tm_hour, ltime->tm_min, ltime->tm_sec);
-#endif
-	std::string write_data;
-	for (auto it : data) {
-		write_data = write_data + it + "\r\n";
-	}
-
-    QString qpath = QString::fromUtf8(filename);
-
-    QFile qfile(qpath);
-    if (!qfile.open(QFile::WriteOnly|QFile::Text)) {
-        qCritical() << "File open fail.[" << qpath << "][" << filename << "]";
-        qCritical() << "Data : " << QString::fromUtf8(write_data.c_str()) << " save fail.";
+    // column size check
+    if (words.size() != 26) {
+        qCritical() << "Read data column count missmatch.";
         return;
     }
 
-    qInfo() << "Save file path : [" << qpath << "][" << filename << "]";
+    // date time size check
+    if (words[10].size() != 19) {
+        qCritical() << "DateTime column size missmatch.";
+        return;
+    }
 
-    QString qwrite_data = QString::fromUtf8(write_data.c_str());
+    // parse date time
+    std::string datetime = words[10];
+    std::string tyear = datetime.substr(0, 4);
+    std::string tmon = datetime.substr(5, 2);
+    std::string tday = datetime.substr(8, 2);
+    std::string thour = datetime.substr(11, 2);
+    std::string tmin = datetime.substr(14, 2);
+    std::string tsec = datetime.substr(17, 2);
+
+    // make key
+    std::string key = words[2] + "_" + words[0] + "_" + words[3] + "_" + tyear + tmon + tday + "_" + thour + tmin + tsec;
+
+    std::string json_string;
+    for (int i = 0; i < 26; i++) {
+        char key_value[256] = {0, };
+        if (i < 12 && words[i] == "NONE") {
+            words[i] = "";
+        } else if (i > 11 && words[i] == "0") {
+            words[i] = "";
+        }
+
+        if (i == 0) {
+            snprintf(key_value, sizeof(key_value), "{ \"%s\" : \"%s\", ", column_list_[i].c_str(), words[i].c_str());
+        } else if (i == 25) {
+            snprintf(key_value, sizeof(key_value), "\"%s\" : \"%s\" }", column_list_[i].c_str(), words[i].c_str());
+        } else {
+            snprintf(key_value, sizeof(key_value), "\"%s\" : \"%s\", ", column_list_[i].c_str(), words[i].c_str());
+        }
+        json_string += key_value;
+    }
+
+    std::string file_path = path_ + "\\" + key + ".log";
+    QString qpath = QString::fromUtf8(file_path.c_str());
+
+    QFile qfile(qpath);
+    if (!qfile.open(QFile::WriteOnly|QFile::Text)) {
+        qCritical() << "File open fail.[" << qpath << "][" << file_path.c_str() << "]";
+        return;
+    }
+
+    qInfo() << "Save file path : [" << qpath << "][" << file_path.c_str() << "]";
+
+    QString qwrite_data = QString::fromUtf8(json_string.c_str());
     QTextStream saveStream(&qfile);
     saveStream << qwrite_data;
     qfile.close();
 
-    char datetime[512] = {0, };
-    snprintf(datetime, sizeof(datetime), "%04d-%02d-%02d %02d:%02d:%02d",
-             ltime->tm_year, ltime->tm_mon, ltime->tm_mday, ltime->tm_hour, ltime->tm_min, ltime->tm_sec);
-    QString qdatetime = QString::fromUtf8(datetime);
+    QString qdatetime = QString::fromUtf8(datetime.c_str());
     acceptor* acptor = static_cast<acceptor *>(parent_);
     acptor->receive_date_time(qdatetime);
-
-    //FILE *p = fopen(filename, "w");
-    //fwrite(write_data.data(), write_data.size(), 1, p);
-    //fclose(p);
 }

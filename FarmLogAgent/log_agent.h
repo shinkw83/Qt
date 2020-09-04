@@ -27,25 +27,14 @@ public:
 
 private:
     void set_column_list();
-	void run();
-	void proc_save();
-	void save_func();
-	void write_func(const std::string &key, const time_t &mesure_time, const std::vector<std::string> &data);
+
+    void start_read();
+    void handle_read(const boost::system::error_code &ec, std::size_t n);
+    void save_data(std::string data);
 
 private:
 	tcp::socket *sock_;
-
-	std::thread run_th_;
-	std::atomic<bool> run_flag_{ true };
-
-	std::thread proc_th_;
-	std::atomic<bool> proc_flag_{ true };
-
-	std::map<time_t, std::vector<std::string>> log_data_;
-	std::map<std::string, std::set<time_t>> log_key_;
-
-	std::mutex log_mutex_;
-	std::atomic<bool> save_flag_{ false };
+    std::vector<char> data_;
 
 	std::string path_;
     int pkt_size_;
